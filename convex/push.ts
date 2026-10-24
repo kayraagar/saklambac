@@ -30,9 +30,8 @@ export const send = internalAction({
         title,
         body,
         data,
-        sound: "default",
         priority: "high",
-        channelId: "default",
+        channelId: "game", // silent, vibrate-only channel; no `sound` so hiders aren't given away
       }));
       try {
         const res = await fetch(EXPO_PUSH_URL, {

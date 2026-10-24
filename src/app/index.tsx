@@ -1,98 +1,115 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuthActions } from "@convex-dev/auth/react";
+import { useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
+import { router } from "expo-router";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { api } from "../../convex/_generated/api";
+import { Button } from "@/components/button";
+import { Card } from "@/components/card";
+import { Screen } from "@/components/screen";
+import { AppText } from "@/components/text";
+import { Colors, Spacing, teamColor, teamLabel } from "@/constants/theme";
+import { formatClock } from "@/lib/format";
+import { gameRoute, phaseForStatus } from "@/lib/routes";
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+type MyGame = FunctionReturnType<typeof api.games.myGames>[number];
+
+const statusLabel: Record<MyGame["status"], string> = {
+  lobby: "Lobide",
+  headStart: "Kaçış süresi",
+  hunting: "Av sürüyor",
+  ended: "Bitti",
+};
+
+export default function Home() {
+  const me = useQuery(api.profiles.me);
+  const games = useQuery(api.games.myGames);
+  const { signOut } = useAuthActions();
+
+  const active = games?.filter((g) => g.status !== "ended") ?? [];
+  const past = games?.filter((g) => g.status === "ended").slice(0, 10) ?? [];
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+    <Screen>
+      <View style={styles.header}>
+        <View style={styles.flex}>
+          <AppText variant="caption">Merhaba,</AppText>
+          <AppText variant="title">{me?.profile?.name ?? "…"}</AppText>
+        </View>
+        <Button title="Çıkış" variant="ghost" compact onPress={() => void signOut()} />
+      </View>
+
+      <Button title="Oyun kur" onPress={() => router.push("/host")} />
+      <Button title="Koda katıl" variant="runner" onPress={() => router.push("/join")} />
+
+      {games === undefined ? (
+        <ActivityIndicator color={Colors.textMuted} style={styles.loader} />
+      ) : (
+        <>
+          {active.length > 0 ? <AppText variant="label">Devam eden oyunlar</AppText> : null}
+          {active.map((g) => (
+            <GameRow key={g.gameId} game={g} />
+          ))}
+          {past.length > 0 ? <AppText variant="label">Geçmiş oyunlar</AppText> : null}
+          {past.map((g) => (
+            <GameRow key={g.gameId} game={g} />
+          ))}
+          {games.length === 0 ? (
+            <AppText variant="caption" style={styles.empty}>
+              Henüz oyunun yok. Bir oyun kur ya da arkadaşının kodunu gir.
+            </AppText>
+          ) : null}
+        </>
+      )}
+    </Screen>
   );
 }
 
-export default function HomeScreen() {
+function GameRow({ game }: { game: MyGame }) {
+  const sub =
+    game.status === "ended"
+      ? game.winner === "hunters"
+        ? "Avcılar kazandı"
+        : game.winner === "runners"
+          ? "Kaçaklar kazandı"
+          : "Bitti"
+      : statusLabel[game.status];
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => router.push(gameRoute(game.gameId, phaseForStatus(game.status)))}
+    >
+      {({ pressed }) => (
+        <Card style={[styles.row, pressed && styles.pressed]}>
+          <View style={styles.flex}>
+            <AppText variant="mono" style={styles.code}>
+              {game.code}
+            </AppText>
+            <AppText variant="caption">
+              {sub} · {formatClock(game.startedAt ?? game.createdAt)}
+              {game.isHost ? " · Kurucu" : ""}
+            </AppText>
+          </View>
+          {game.team ? (
+            <AppText style={styles.team} color={teamColor(game.team)}>
+              {teamLabel(game.team)}
+            </AppText>
+          ) : null}
+          <AppText color={Colors.textMuted}>›</AppText>
+        </Card>
+      )}
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
+  header: { flexDirection: "row", alignItems: "center", paddingVertical: Spacing.md },
+  flex: { flex: 1 },
+  loader: { marginTop: Spacing.lg },
+  empty: { textAlign: "center", marginTop: Spacing.lg },
+  row: { flexDirection: "row", alignItems: "center", gap: Spacing.md },
+  pressed: { opacity: 0.7 },
+  code: { fontSize: 20, letterSpacing: 3 },
+  team: { fontWeight: "800" },
 });
