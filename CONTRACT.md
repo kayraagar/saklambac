@@ -38,6 +38,9 @@ visibility(viewer: PlayerState, target: PlayerState, s: GameSettings, now: numbe
 checkWinner(players: PlayerState[], phase: "headStart" | "hunting" | "over"): Winner | null
 ```
 
+Timing (as implemented): `roundMs` is hunting time only. The round ends at `startedAt + headStartMs + roundMs`; use the
+`headStartEndAt` / `roundEndAt` helpers. `nextPingAt` returns the next ping strictly after `now`.
+
 Visibility rules:
 
 - Self → live.
@@ -101,3 +104,17 @@ Dark night palette:
 - Bold rounded sans (system font)
 
 Turkish-first UI copy, English as a later add.
+
+## Backend as built (read this before calling Convex from the app)
+
+- Errors: `ConvexError` with Turkish string in `err.data`.
+- `games.byId` → `{game, phase: "lobby"|"headStart"|"hunting"|"over", serverNow, headStartEndsAt, roundEndsAt, nextPingAt, runners:{active,tagged,total}, hunters, playerCount, me:{playerId, team, status, isHost, taggedAt, outOfZoneSince}}`. Countdowns: offset = serverNow − Date.now() at receipt.
+- `games.lobby` → `{players[{playerId,userId,name,pref,ready,team,isHost,isMe}], canStart, allReady, hunterRange, settings, code, isHost, …}`; `start` does not require allReady.
+- `map.view` → `{live: Pos[], delayed: Pos[], lastPing}`, `Pos = {playerId,name,team,status,lat,lng,at,isMe}`. After the game ends everyone is live.
+- `messages.list` → last 100 of caller's team, oldest first, with `isMe`. Tagged non-hunters can read but not send.
+- `locations.report` → `{accepted}`; false outside headStart/hunting (stop reporting then).
+- `profiles.me()` → `null` signed out, else `{userId, email, profile: {name, username} | null}` (null profile → onboarding).
+- `games.join` code is case-insensitive.
+- Auth client: `ConvexAuthProvider` from `@convex-dev/auth/react` with an `expo-secure-store` storage adapter; `signIn("resend-otp", {email})` then `signIn("resend-otp", {email, code})`. 6-digit codes; in dev without `AUTH_RESEND_KEY` the code is in the Convex log.
+- `push.registerToken` accepts `ExponentPushToken[...]`. Push `data` = `{type: "ping"|"tag"|"roundOver"|"start"|"hunting", gameId}`.
+- URL: `EXPO_PUBLIC_CONVEX_URL` in `.env.local` (local: http://127.0.0.1:3211; use LAN IP on a device). Run backend: `CONVEX_AGENT_MODE=anonymous npx convex dev`.
