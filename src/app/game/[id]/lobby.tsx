@@ -46,6 +46,8 @@ export default function LobbyScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const openSettings = () => router.push(`/game/${gameId}/settings`);
+
   if (!lobby) return <Loading />;
   const me = lobby.players.find((p) => p.isMe);
 
@@ -107,7 +109,8 @@ export default function LobbyScreen() {
       {me ? (
         <Segmented options={PREFS} value={me.pref} onChange={(pref) => run(() => setPref({ gameId, pref }))} />
       ) : null}
-      <AppText variant="caption">{hunterHint(lobby)}</AppText>
+      {/* The host sees the "need more players" hint once, above the start button. */}
+      {hunterHint(lobby, !lobby.isHost) ? <AppText variant="caption">{hunterHint(lobby, !lobby.isHost)}</AppText> : null}
 
       <AppText variant="label">Oyuncular ({lobby.players.length})</AppText>
       <Card>
@@ -137,22 +140,17 @@ export default function LobbyScreen() {
         <Rule label="Yakalananlar avcı olur" value={lobby.settings.taggedJoinHunters ? "Evet" : "Hayır"} />
         <Rule label="İzleyiciler canlı görür" value={lobby.settings.taggedSeeLive ? "Evet" : "60 sn gecikmeli"} />
         {lobby.isHost ? (
-          <Button
-            title="Ayarları düzenle"
-            variant="secondary"
-            compact
-            onPress={() => router.push(`/game/${gameId}/settings`)}
-          />
+          <Button title="Ayarları düzenle" variant="secondary" compact onPress={openSettings} />
         ) : null}
       </Card>
     </Screen>
   );
 }
 
-function hunterHint(lobby: Lobby): string {
+function hunterHint(lobby: Lobby, includeMinPlayers: boolean): string | null {
   const n = lobby.players.length;
   const { min, max } = lobby.hunterRange;
-  if (n < MIN_PLAYERS) return `En az ${MIN_PLAYERS} oyuncu gerekli (şu an ${n}).`;
+  if (n < MIN_PLAYERS) return includeMinPlayers ? `En az ${MIN_PLAYERS} oyuncu gerekli (şu an ${n}).` : null;
   return min === max ? `${n} oyuncuyla ${min} avcı` : `${n} oyuncuyla ${min}–${max} avcı`;
 }
 

@@ -48,5 +48,5 @@ const styles = StyleSheet.create({
   },
   stat: { flex: 1, alignItems: "center" },
   statValue: { fontSize: 18 },
-  statLabel: { fontSize: 11, fontWeight: "700", color: Colors.textMuted, textTransform: "uppercase" },
+  statLabel: { fontSize: 11, fontWeight: "700", color: Colors.textMuted },
 });

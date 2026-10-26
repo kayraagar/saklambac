@@ -20,7 +20,7 @@ export function Screen({
     <SafeAreaView style={styles.root} edges={edges}>
       <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         {scroll ? (
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <ScrollView style={styles.root} contentContainerStyle={[styles.content, footer ? styles.contentWithFooter : null]} keyboardShouldPersistTaps="handled">
             {children}
           </ScrollView>
         ) : (
@@ -35,5 +35,15 @@ export function Screen({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.lg, gap: Spacing.md, flexGrow: 1 },
-  footer: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md, gap: Spacing.sm },
+  contentWithFooter: { paddingBottom: Spacing.xl },
+  // In normal layout flow below the ScrollView, so it never covers scroll content.
+  footer: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.md,
+    gap: Spacing.sm,
+    backgroundColor: Colors.background,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  },
 });

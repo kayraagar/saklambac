@@ -1,37 +1,51 @@
 import { useEffect, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import MapView, { Circle, type Region } from "react-native-maps";
 
-import { Colors } from "@/constants/theme";
+import { Colors, Radius, Spacing } from "@/constants/theme";
 import type { LatLng } from "@/engine";
 import { DARK_MAP_STYLE, regionFor, toCoord } from "@/lib/map";
+import { AppText } from "./text";
+import { useMapLocation } from "./use-map-location";
 
 /**
  * Pan the map to place the zone: the zone center is always the map center,
- * with a live circle overlay. `recenterTo` (e.g. the user's first GPS fix)
- * moves the map once, unless the user has already panned.
+ * with a live circle overlay. With `autoCenter`, the map (and so the zone) jumps to
+ * the user's position when it first arrives — once, and never after the user has panned.
  */
 export function ZonePicker({
   center,
   radiusM,
   onCenterChange,
-  recenterTo,
+  autoCenter = false,
 }: {
   center: LatLng;
   radiusM: number;
   onCenterChange: (c: LatLng) => void;
-  recenterTo?: LatLng | null;
+  autoCenter?: boolean;
 }) {
   const mapRef = useRef<MapView>(null);
   const [initialRegion] = useState(() => regionFor(center, radiusM));
   const touched = useRef(false);
-  const recentered = useRef(false);
+  const centeredOn = useRef<"none" | "approx" | "precise">("none");
+  const loc = useMapLocation();
 
+  const goTo = (p: LatLng, ms = 400) => {
+    mapRef.current?.animateToRegion(regionFor(p, radiusM), ms);
+    onCenterChange(p);
+  };
+
+  // Auto-center: first on the last known fix, then once more on the first live GPS fix
+  // (unless the user has started dragging in between).
   useEffect(() => {
-    if (!recenterTo || touched.current || recentered.current) return;
-    recentered.current = true;
-    mapRef.current?.animateToRegion(regionFor(recenterTo, radiusM), 400);
-  }, [recenterTo, radiusM]);
+    if (!autoCenter || !loc.position || touched.current) return;
+    const level = loc.precise ? "precise" : "approx";
+    if (centeredOn.current === "precise" || centeredOn.current === level) return;
+    centeredOn.current = level;
+    goTo(loc.position);
+    // goTo is recreated each render; only position changes matter here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCenter, loc.position, loc.precise]);
 
   // Zoom to fit when the diameter changes.
   const lastRadius = useRef(radiusM);
@@ -48,6 +62,12 @@ export function ZonePicker({
     onCenterChange({ lat: r.latitude, lng: r.longitude });
   };
 
+  const locateMe = () => {
+    if (loc.position) return goTo(loc.position);
+    if (loc.status === "denied") return loc.openSettings();
+    void loc.request();
+  };
+
   return (
     <View style={styles.wrap}>
       <MapView
@@ -59,7 +79,8 @@ export function ZonePicker({
         onPanDrag={() => (touched.current = true)}
         userInterfaceStyle="dark"
         customMapStyle={DARK_MAP_STYLE}
-        showsUserLocation
+        showsUserLocation={loc.status === "granted"}
+        showsMyLocationButton={false}
         showsPointsOfInterests={false}
         rotateEnabled={false}
         pitchEnabled={false}
@@ -76,7 +97,48 @@ export function ZonePicker({
       <View pointerEvents="none" style={styles.crosshair}>
         <View style={styles.dot} />
       </View>
+
+      {loc.status === "undetermined" ? (
+        <View style={styles.banner} pointerEvents="box-none">
+          <AppText variant="caption" style={styles.bannerText}>
+            Oyun alanını bulunduğun yere yerleştirmek için konum iznine ihtiyacımız var.
+          </AppText>
+          <BannerButton title="İzin ver" onPress={() => void loc.request()} />
+        </View>
+      ) : loc.status === "denied" ? (
+        <View style={styles.banner} pointerEvents="box-none">
+          <AppText variant="caption" style={styles.bannerText}>
+            Konum izni kapalı. Alanı elle yerleştirebilir ya da izin verebilirsin.
+          </AppText>
+          <BannerButton title="Ayarları aç" onPress={loc.openSettings} />
+        </View>
+      ) : null}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Konumuma git"
+        onPress={locateMe}
+        style={({ pressed }) => [styles.locate, pressed && styles.pressed]}
+      >
+        <AppText style={styles.locateText} color={Colors.hunter}>
+          ◎ Konumuma git
+        </AppText>
+      </Pressable>
     </View>
+  );
+}
+
+function BannerButton({ title, onPress }: { title: string; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.bannerButton, pressed && styles.pressed]}
+    >
+      <AppText style={styles.bannerButtonText} color={Colors.onAccent}>
+        {title}
+      </AppText>
+    </Pressable>
   );
 }
 
@@ -91,4 +153,38 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: Colors.background,
   },
+  banner: {
+    position: "absolute",
+    top: Spacing.sm,
+    left: Spacing.sm,
+    right: Spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    backgroundColor: Colors.overlay,
+    borderRadius: Radius.sm,
+    padding: Spacing.sm,
+  },
+  bannerText: { flex: 1, color: Colors.text },
+  bannerButton: {
+    backgroundColor: Colors.hunter,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+  },
+  bannerButtonText: { fontSize: 13, fontWeight: "800" },
+  locate: {
+    position: "absolute",
+    right: Spacing.sm,
+    bottom: Spacing.sm,
+    backgroundColor: Colors.surface,
+    borderColor: Colors.border,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.pill,
+    paddingHorizontal: Spacing.md,
+    minHeight: 40,
+    justifyContent: "center",
+  },
+  locateText: { fontSize: 14, fontWeight: "800" },
+  pressed: { opacity: 0.7 },
 });

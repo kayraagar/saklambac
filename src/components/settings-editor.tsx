@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Colors, Spacing } from "@/constants/theme";
-import { SETTING_LIMITS, validateSettings, type GameSettings, type LatLng } from "@/engine";
+import { SETTING_LIMITS, validateSettings, type GameSettings } from "@/engine";
 import { errorMessage } from "@/lib/errors";
 import { formatMeters, formatMinutes } from "@/lib/format";
 import { Button } from "./button";
@@ -20,12 +20,13 @@ const L = SETTING_LIMITS;
 /** Zone map + rule controls; used for creating a game and for editing it in the lobby. */
 export function SettingsEditor({
   initial,
-  recenterTo,
+  autoCenter = false,
   submitLabel,
   onSubmit,
 }: {
   initial: GameSettings;
-  recenterTo?: LatLng | null;
+  /** Move the zone to the user's position once it is known (new games only). */
+  autoCenter?: boolean;
   submitLabel: string;
   onSubmit: (s: GameSettings) => Promise<void>;
 }) {
@@ -53,10 +54,10 @@ export function SettingsEditor({
       <ZonePicker
         center={s.zone.center}
         radiusM={s.zone.radiusM}
-        recenterTo={recenterTo}
+        autoCenter={autoCenter}
         onCenterChange={(center) => setS((prev) => ({ ...prev, zone: { ...prev.zone, center } }))}
       />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <AppText variant="caption">Haritayı kaydırarak oyun alanını yerleştir. Alanın merkezi haritanın merkezidir.</AppText>
         <Card>
           <Stepper
@@ -122,6 +123,14 @@ export function SettingsEditor({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.md, gap: Spacing.md },
-  footer: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm },
+  scroll: { flex: 1 },
+  content: { padding: Spacing.md, paddingBottom: Spacing.xl, gap: Spacing.md },
+  footer: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
+    backgroundColor: Colors.background,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  },
 });
