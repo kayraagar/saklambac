@@ -2,6 +2,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import Constants from "expo-constants";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -65,16 +66,20 @@ export default function Profile() {
     setUploading(true);
     try {
       const uploadUrl = reachableUrl(await generateUploadUrl());
-      const blob = await (await fetch(asset.uri)).blob();
-      const res = await fetch(uploadUrl, {
-        method: "POST",
+      // Stream the file natively; fetch() with a React Native Blob body doesn't upload reliably.
+      const res = await FileSystem.uploadAsync(uploadUrl, asset.uri, {
+        httpMethod: "POST",
+        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
         headers: { "Content-Type": asset.mimeType ?? "image/jpeg" },
-        body: blob,
       });
-      if (!res.ok) throw new Error("Fotoğraf yüklenemedi, tekrar dene.");
-      const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
+      if (res.status < 200 || res.status >= 300) {
+        console.warn("[avatar] upload failed", res.status, res.body);
+        throw new Error("Fotoğraf yüklenemedi, tekrar dene.");
+      }
+      const { storageId } = JSON.parse(res.body) as { storageId: Id<"_storage"> };
       await setAvatar({ storageId });
     } catch (e: unknown) {
+      console.warn("[avatar]", e);
       Alert.alert("Fotoğraf yüklenemedi", errorMessage(e));
     } finally {
       setUploading(false);
