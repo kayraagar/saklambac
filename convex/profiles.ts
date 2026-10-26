@@ -33,6 +33,42 @@ export const upsert = mutation({
   },
 });
 
+/** Step 1 of an avatar change: the client POSTs the image to this URL and gets a storageId back. */
+export const generateAvatarUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    await requireUser(ctx);
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+/** Step 2: attach the uploaded image (or null to remove it). The previous image is deleted. */
+export const setAvatar = mutation({
+  args: { storageId: v.union(v.id("_storage"), v.null()) },
+  handler: async (ctx, { storageId }) => {
+    const userId = await requireUser(ctx);
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    if (!profile) fail("Önce profilini oluştur.");
+    if (storageId) {
+      const meta = await ctx.db.system.get(storageId);
+      if (!meta) fail("Fotoğraf yüklenemedi, tekrar dene.");
+      if (!meta.contentType?.startsWith("image/")) {
+        await ctx.storage.delete(storageId);
+        fail("Sadece fotoğraf yükleyebilirsin.");
+      }
+      if (meta.size > 5 * 1024 * 1024) {
+        await ctx.storage.delete(storageId);
+        fail("Fotoğraf en fazla 5 MB olabilir.");
+      }
+    }
+    if (profile.avatarId && profile.avatarId !== storageId) await ctx.storage.delete(profile.avatarId);
+    await ctx.db.patch(profile._id, { avatarId: storageId ?? undefined });
+  },
+});
+
 /** Signed-out → null. Signed-in without a profile → { profile: null, email }. */
 export const me = query({
   args: {},
@@ -47,7 +83,13 @@ export const me = query({
     return {
       userId,
       email: user?.email ?? null,
-      profile: profile ? { name: profile.name, username: profile.username } : null,
+      profile: profile
+        ? {
+            name: profile.name,
+            username: profile.username,
+            avatarUrl: profile.avatarId ? await ctx.storage.getUrl(profile.avatarId) : null,
+          }
+        : null,
     };
   },
 });

@@ -46,7 +46,7 @@ function Spot({
         <>
           <View style={styles.crown}>{first ? <Crown color={accent === Colors.text ? Colors.hunter : accent} /> : null}</View>
           <View style={[styles.avatarWrap, row.isMe && { borderColor: accent }]}>
-            <Avatar name={row.name} size={size} team={first && accent !== Colors.text ? (accent === Colors.hunter ? "hunter" : "runner") : null} />
+            <Avatar name={row.name} uri={row.avatarUrl} size={size} team={first && accent !== Colors.text ? (accent === Colors.hunter ? "hunter" : "runner") : null} />
           </View>
           <AppText numberOfLines={1} style={styles.name}>
             {row.isMe ? "Sen" : row.name}

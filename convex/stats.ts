@@ -40,7 +40,14 @@ export type MyStats = {
     runnerPoints: number;
     rank: number | null;
   };
-  week: { weekKey: string; endsAt: number; gamesPlayed: number; wins: number; points: number; rank: number | null };
+  week: {
+    weekKey: string;
+    endsAt: number;
+    gamesPlayed: number;
+    wins: number;
+    points: number;
+    rank: number | null;
+  };
 };
 
 export type LeaderboardRow = {
@@ -48,6 +55,7 @@ export type LeaderboardRow = {
   userId: Id<"users">;
   name: string;
   username: string;
+  avatarUrl: string | null;
   value: number;
   gamesPlayed: number;
   isMe: boolean;
@@ -109,6 +117,13 @@ const BOARD_FIELD: Record<Board, BoardField> = {
 };
 const RANK_SCAN_LIMIT = 1000;
 
+async function avatarUrlOf(
+  ctx: Ctx,
+  profile: { avatarId?: Id<"_storage"> } | null,
+) {
+  return profile?.avatarId ? await ctx.storage.getUrl(profile.avatarId) : null;
+}
+
 async function profileOf(ctx: Ctx, userId: Id<"users">) {
   return await ctx.db
     .query("profiles")
@@ -126,7 +141,9 @@ async function playerStatsOf(ctx: Ctx, userId: Id<"users">) {
 async function weeklyStatsOf(ctx: Ctx, userId: Id<"users">, weekKey: string) {
   return await ctx.db
     .query("weeklyStats")
-    .withIndex("by_user_week", (q) => q.eq("userId", userId).eq("weekKey", weekKey))
+    .withIndex("by_user_week", (q) =>
+      q.eq("userId", userId).eq("weekKey", weekKey),
+    )
     .unique();
 }
 
@@ -134,13 +151,22 @@ async function weeklyStatsOf(ctx: Ctx, userId: Id<"users">, weekKey: string) {
  * Listed rows (value > 0) on a board, highest first. The index names differ only by
  * field, so the field name is cast to one representative literal for typing.
  */
-function boardQuery(ctx: Ctx, board: Board, window: Window, weekKey: string, above = 0) {
+function boardQuery(
+  ctx: Ctx,
+  board: Board,
+  window: Window,
+  weekKey: string,
+  above = 0,
+) {
   const field = BOARD_FIELD[board];
   if (window === "week") {
     return ctx.db
       .query("weeklyStats")
       .withIndex(`by_week_listed_${field}` as "by_week_listed_points", (q) =>
-        q.eq("weekKey", weekKey).eq("listed", true).gt(field as "points", above),
+        q
+          .eq("weekKey", weekKey)
+          .eq("listed", true)
+          .gt(field as "points", above),
       )
       .order("desc");
   }
@@ -153,9 +179,17 @@ function boardQuery(ctx: Ctx, board: Board, window: Window, weekKey: string, abo
 }
 
 /** Competition rank (1, 2, 2, 4) of `value`; null above 1000 or for value 0. */
-async function rankOf(ctx: Ctx, board: Board, window: Window, weekKey: string, value: number) {
+async function rankOf(
+  ctx: Ctx,
+  board: Board,
+  window: Window,
+  weekKey: string,
+  value: number,
+) {
   if (value <= 0) return null;
-  const higher = await boardQuery(ctx, board, window, weekKey, value).take(RANK_SCAN_LIMIT);
+  const higher = await boardQuery(ctx, board, window, weekKey, value).take(
+    RANK_SCAN_LIMIT,
+  );
   return higher.length >= RANK_SCAN_LIMIT ? null : higher.length + 1;
 }
 
@@ -184,7 +218,12 @@ export async function recordGameResults(
   const byId = new Map(players.map((p) => [p._id as string, p]));
   const results = deriveResults(
     { startedAt: game.startedAt, endedAt, winner, settings: game.settings },
-    players.map((p) => ({ id: p._id, team: p.team, status: p.status, taggedAt: p.taggedAt })),
+    players.map((p) => ({
+      id: p._id,
+      team: p.team,
+      status: p.status,
+      taggedAt: p.taggedAt,
+    })),
   );
   const weekKey = weekKeyTR(endedAt);
 
@@ -286,7 +325,9 @@ export async function recordGameResults(
   }
 
   if (results.length > 0) {
-    await ctx.scheduler.runAfter(0, internal.stats.computeDistance, { gameId: game._id });
+    await ctx.scheduler.runAfter(0, internal.stats.computeDistance, {
+      gameId: game._id,
+    });
   }
 }
 
@@ -307,13 +348,18 @@ export const computeDistance = internalMutation({
       let total = 0;
       const player = await ctx.db
         .query("players")
-        .withIndex("by_game_user", (q) => q.eq("gameId", gameId).eq("userId", row.userId))
+        .withIndex("by_game_user", (q) =>
+          q.eq("gameId", gameId).eq("userId", row.userId),
+        )
         .unique();
       if (game && player && game.startedAt !== undefined) {
         const points = await ctx.db
           .query("positionHistory")
           .withIndex("by_player_at", (q) =>
-            q.eq("playerId", player._id).gte("at", game.startedAt!).lte("at", row.endedAt),
+            q
+              .eq("playerId", player._id)
+              .gte("at", game.startedAt!)
+              .lte("at", row.endedAt),
           )
           .take(5000);
         for (let i = 1; i < points.length; i++) {
@@ -328,7 +374,8 @@ export const computeDistance = internalMutation({
       const distanceM = Math.round(total);
       await ctx.db.patch(row._id, { distanceM });
       const all = await playerStatsOf(ctx, row.userId);
-      if (all && distanceM > 0) await ctx.db.patch(all._id, { distanceM: all.distanceM + distanceM });
+      if (all && distanceM > 0)
+        await ctx.db.patch(all._id, { distanceM: all.distanceM + distanceM });
     }
   },
 });
@@ -362,7 +409,10 @@ export const mine = query({
         points: all?.points ?? 0,
         hunterPoints: all?.hunterPoints ?? 0,
         runnerPoints: all?.runnerPoints ?? 0,
-        rank: listed && all ? await rankOf(ctx, "points", "all", weekKey, all.points) : null,
+        rank:
+          listed && all
+            ? await rankOf(ctx, "points", "all", weekKey, all.points)
+            : null,
       },
       week: {
         weekKey,
@@ -370,7 +420,10 @@ export const mine = query({
         gamesPlayed: week?.gamesPlayed ?? 0,
         wins: week?.wins ?? 0,
         points: week?.points ?? 0,
-        rank: listed && week ? await rankOf(ctx, "points", "week", weekKey, week.points) : null,
+        rank:
+          listed && week
+            ? await rankOf(ctx, "points", "week", weekKey, week.points)
+            : null,
       },
     };
   },
@@ -378,7 +431,10 @@ export const mine = query({
 
 export const leaderboard = query({
   args: { board: boardV, window: windowV, limit: v.optional(v.number()) },
-  handler: async (ctx, { board, window, limit }): Promise<LeaderboardResult> => {
+  handler: async (
+    ctx,
+    { board, window, limit },
+  ): Promise<LeaderboardResult> => {
     const now = Date.now();
     const weekKey = weekKeyTR(now);
     const take = Math.min(Math.max(Math.floor(limit ?? 50), 1), 100);
@@ -398,6 +454,7 @@ export const leaderboard = query({
         userId: s.userId,
         name: profile?.name ?? "Oyuncu",
         username: profile?.username ?? "",
+        avatarUrl: await avatarUrlOf(ctx, profile),
         value,
         gamesPlayed: s.gamesPlayed,
         isMe: s.userId === myId,
@@ -406,7 +463,10 @@ export const leaderboard = query({
 
     let me: LeaderboardRow | null = rows.find((r) => r.isMe) ?? null;
     if (!me && myId) {
-      const mine = window === "week" ? await weeklyStatsOf(ctx, myId, weekKey) : await playerStatsOf(ctx, myId);
+      const mine =
+        window === "week"
+          ? await weeklyStatsOf(ctx, myId, weekKey)
+          : await playerStatsOf(ctx, myId);
       const profile = await profileOf(ctx, myId);
       if (mine && !profile?.hideFromLeaderboard && mine[field] > 0) {
         const rank = await rankOf(ctx, board, window, weekKey, mine[field]);
@@ -416,6 +476,7 @@ export const leaderboard = query({
           userId: myId,
           name: profile?.name ?? "Oyuncu",
           username: profile?.username ?? "",
+          avatarUrl: await avatarUrlOf(ctx, profile),
           value: mine[field],
           gamesPlayed: mine.gamesPlayed,
           isMe: true,
@@ -423,7 +484,14 @@ export const leaderboard = query({
       }
     }
 
-    return { board, window, weekKey, endsAt: window === "week" ? weekEndsAtTR(now) : null, rows, me };
+    return {
+      board,
+      window,
+      weekKey,
+      endsAt: window === "week" ? weekEndsAtTR(now) : null,
+      rows,
+      me,
+    };
   },
 });
 
@@ -434,7 +502,9 @@ export const forGame = query({
     if (!userId) return null;
     const row = await ctx.db
       .query("gameResults")
-      .withIndex("by_game_user", (q) => q.eq("gameId", gameId).eq("userId", userId))
+      .withIndex("by_game_user", (q) =>
+        q.eq("gameId", gameId).eq("userId", userId),
+      )
       .unique();
     if (!row) return null;
     const week = await weeklyStatsOf(ctx, userId, row.weekKey);
@@ -452,7 +522,9 @@ export const forGame = query({
       breakdown: row.breakdown,
       week: {
         points: weekPoints,
-        rank: profile?.hideFromLeaderboard ? null : await rankOf(ctx, "points", "week", row.weekKey, weekPoints),
+        rank: profile?.hideFromLeaderboard
+          ? null
+          : await rankOf(ctx, "points", "week", row.weekKey, weekPoints),
       },
     };
   },
@@ -493,7 +565,8 @@ export const setListed = mutation({
   handler: async (ctx, { listed }) => {
     const userId = await requireUser(ctx);
     const profile = await profileOf(ctx, userId);
-    if (profile) await ctx.db.patch(profile._id, { hideFromLeaderboard: !listed });
+    if (profile)
+      await ctx.db.patch(profile._id, { hideFromLeaderboard: !listed });
     const all = await playerStatsOf(ctx, userId);
     if (all) await ctx.db.patch(all._id, { listed });
     const weeks = await ctx.db
@@ -515,13 +588,23 @@ export const backfill = internalMutation({
       .collect();
     let recorded = 0;
     for (const game of games) {
-      if (game.status !== "ended" || !game.winner || game.startedAt === undefined) continue;
+      if (
+        game.status !== "ended" ||
+        !game.winner ||
+        game.startedAt === undefined
+      )
+        continue;
       const existing = await ctx.db
         .query("gameResults")
         .withIndex("by_game", (q) => q.eq("gameId", game._id))
         .first();
       if (existing) continue;
-      await recordGameResults(ctx, game, game.winner, game.endedAt ?? Date.now());
+      await recordGameResults(
+        ctx,
+        game,
+        game.winner,
+        game.endedAt ?? Date.now(),
+      );
       recorded++;
     }
     return { recorded };

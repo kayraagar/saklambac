@@ -43,7 +43,7 @@ export default function Home() {
           hitSlop={8}
           onPress={() => router.navigate("/profile")}
         >
-          <Avatar name={me?.profile?.name ?? "?"} size={44} />
+          <Avatar name={me?.profile?.name ?? "?"} uri={me?.profile?.avatarUrl} size={44} />
         </Pressable>
       </View>
 

@@ -35,7 +35,7 @@ export function LeaderboardRowView({
       <AppText variant="mono" style={styles.rank} color={me ? accent : Colors.textMuted} numberOfLines={1}>
         {pinned ? `#${rankLabel(row.rank)}` : rankLabel(row.rank)}
       </AppText>
-      <Avatar name={row.name} size={36} />
+      <Avatar name={row.name} uri={row.avatarUrl} size={36} />
       <View style={styles.who}>
         <AppText numberOfLines={1} style={styles.name}>
           {pinned ? "Sen" : row.name}

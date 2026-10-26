@@ -2,11 +2,13 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import Constants from "expo-constants";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from "react-native";
 
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { Avatar } from "@/components/characters";
 import { StatRow, StatTile } from "@/components/home/stat-tile";
 import { Screen } from "@/components/screen";
@@ -15,6 +17,7 @@ import { ToggleRow } from "@/components/toggle-row";
 import { Colors, Radius, Spacing, teamColor, teamLabel } from "@/constants/theme";
 import { errorMessage } from "@/lib/errors";
 import { formatMinutes } from "@/lib/format";
+import { reachableUrl } from "@/lib/storage-url";
 
 type RecentResult = FunctionReturnType<typeof api.stats.recentResults>[number];
 
@@ -26,6 +29,9 @@ export default function Profile() {
   const stats = useQuery(api.stats.mine, {});
   const recent = useQuery(api.stats.recentResults, { limit: 10 });
   const setListed = useMutation(api.stats.setListed);
+  const generateUploadUrl = useMutation(api.profiles.generateAvatarUploadUrl);
+  const setAvatar = useMutation(api.profiles.setAvatar);
+  const [uploading, setUploading] = useState(false);
   const { signOut } = useAuthActions();
   // Optimistic switch value while the mutation runs.
   const [pendingListed, setPendingListed] = useState<boolean | null>(null);
@@ -47,6 +53,47 @@ export default function Profile() {
       .finally(() => setPendingListed(null));
   };
 
+  const pickPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    setUploading(true);
+    try {
+      const uploadUrl = reachableUrl(await generateUploadUrl());
+      const blob = await (await fetch(asset.uri)).blob();
+      const res = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": asset.mimeType ?? "image/jpeg" },
+        body: blob,
+      });
+      if (!res.ok) throw new Error("Fotoğraf yüklenemedi, tekrar dene.");
+      const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
+      await setAvatar({ storageId });
+    } catch (e: unknown) {
+      Alert.alert("Fotoğraf yüklenemedi", errorMessage(e));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removePhoto = () =>
+    setAvatar({ storageId: null }).catch((e: unknown) => Alert.alert("Kaldırılamadı", errorMessage(e)));
+
+  const onAvatarPress = () => {
+    if (uploading) return;
+    if (!profile?.avatarUrl) return void pickPhoto();
+    Alert.alert("Profil fotoğrafı", undefined, [
+      { text: "Yeni fotoğraf seç", onPress: () => void pickPhoto() },
+      { text: "Fotoğrafı kaldır", style: "destructive", onPress: () => void removePhoto() },
+      { text: "Vazgeç", style: "cancel" },
+    ]);
+  };
+
   const confirmSignOut = () =>
     Alert.alert("Çıkış yapılsın mı?", undefined, [
       { text: "Vazgeç", style: "cancel" },
@@ -56,7 +103,23 @@ export default function Profile() {
   return (
     <Screen>
       <View style={styles.head}>
-        <Avatar name={profile?.name ?? "?"} team={mainTeam} size={72} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={profile?.avatarUrl ? "Profil fotoğrafını değiştir" : "Profil fotoğrafı ekle"}
+          onPress={onAvatarPress}
+          style={({ pressed }) => pressed && styles.avatarPressed}
+        >
+          <Avatar name={profile?.name ?? "?"} uri={profile?.avatarUrl} team={mainTeam} size={88} />
+          <View style={styles.avatarBadge}>
+            {uploading ? (
+              <ActivityIndicator size="small" color={Colors.background} />
+            ) : (
+              <AppText style={styles.avatarBadgeText} color={Colors.background}>
+                {profile?.avatarUrl ? "✎" : "+"}
+              </AppText>
+            )}
+          </View>
+        </Pressable>
         <AppText variant="title" style={styles.center} numberOfLines={1}>
           {profile?.name ?? "…"}
         </AppText>
@@ -106,7 +169,7 @@ export default function Profile() {
       <View style={styles.section}>
         <AppText variant="label">Ayarlar</AppText>
         <View style={styles.list}>
-          <View style={styles.item}>
+          <View style={[styles.item, styles.toggleItem]}>
             <ToggleRow
               label="Sıralamada görün"
               hint="Kapalıyken adın sıralamalarda görünmez."
@@ -217,6 +280,21 @@ function LinkRow({
 const styles = StyleSheet.create({
   head: { alignItems: "center", gap: Spacing.xs, paddingVertical: Spacing.md },
   center: { textAlign: "center" },
+  avatarPressed: { opacity: 0.8 },
+  avatarBadge: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.hunter,
+    borderWidth: 3,
+    borderColor: Colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarBadgeText: { fontSize: 15, fontWeight: "900", lineHeight: 18 },
   flex: { flex: 1 },
   bold: { fontWeight: "700" },
   section: { gap: Spacing.sm },
@@ -228,6 +306,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   item: { paddingHorizontal: Spacing.md },
+  toggleItem: { paddingVertical: Spacing.sm },
   divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border },
   pressed: { backgroundColor: Colors.surfaceRaised },
   linkRow: { flexDirection: "row", alignItems: "center", minHeight: 52 },

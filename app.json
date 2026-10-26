@@ -57,6 +57,14 @@
           "defaultChannel": "game",
           "enableBackgroundRemoteNotifications": false
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Profil fotoğrafını seçebilmen için fotoğraflarına erişmek istiyoruz.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

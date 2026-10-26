@@ -44,7 +44,7 @@ export function MiniLeaderboard({
             <AppText style={styles.rank} color={medal[r.rank - 1] ?? Colors.textMuted}>
               {r.rank}
             </AppText>
-            <Avatar name={r.name} team={team ?? null} size={32} />
+            <Avatar name={r.name} uri={r.avatarUrl} team={team ?? null} size={32} />
             <View style={styles.flex}>
               <AppText style={styles.name} numberOfLines={1}>
                 {r.name}

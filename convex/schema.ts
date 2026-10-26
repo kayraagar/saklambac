@@ -19,6 +19,7 @@ export default defineSchema({
     name: v.string(),
     username: v.string(), // stored lowercase
     hideFromLeaderboard: v.optional(v.boolean()), // source of truth for stats `listed`
+    avatarId: v.optional(v.id("_storage")),
   })
     .index("by_user", ["userId"])
     .index("by_username", ["username"]),
