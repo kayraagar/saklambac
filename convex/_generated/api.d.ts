@@ -19,6 +19,7 @@ import type * as map from "../map.js";
 import type * as messages from "../messages.js";
 import type * as profiles from "../profiles.js";
 import type * as push from "../push.js";
+import type * as stats from "../stats.js";
 import type * as validators from "../validators.js";
 
 import type {
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   messages: typeof messages;
   profiles: typeof profiles;
   push: typeof push;
+  stats: typeof stats;
   validators: typeof validators;
 }>;
 

@@ -27,6 +27,7 @@ export const playerStatusV = v.union(
   v.literal("left"),
 );
 export const winnerV = v.union(v.literal("hunters"), v.literal("runners"));
+export const outcomeV = v.union(v.literal("win"), v.literal("loss"));
 
 export const latLngV = v.object({ lat: v.number(), lng: v.number() });
 export const zoneV = v.object({ center: latLngV, radiusM: v.number() });

@@ -118,3 +118,18 @@ Turkish-first UI copy, English as a later add.
 - Auth client: `ConvexAuthProvider` from `@convex-dev/auth/react` with an `expo-secure-store` storage adapter; `signIn("resend-otp", {email})` then `signIn("resend-otp", {email, code})`. 6-digit codes; in dev without `AUTH_RESEND_KEY` the code is in the Convex log.
 - `push.registerToken` accepts `ExponentPushToken[...]`. Push `data` = `{type: "ping"|"tag"|"roundOver"|"start"|"hunting", gameId}`.
 - URL: `EXPO_PUBLIC_CONVEX_URL` in `.env.local` (local: http://127.0.0.1:3211; use LAN IP on a device). Run backend: `CONVEX_AGENT_MODE=anonymous npx convex dev`.
+
+## Stats (v2)
+
+Full design: `docs/DESIGN-v2.md`. Points formula: `src/engine/points.ts`.
+
+- Results are written once per game by `recordGameResults` inside `finishGame` (`convex/games.ts`). This produces immutable `gameResults` rows plus the `playerStats` (all-time) and `weeklyStats` (ISO week key) aggregates.
+- Queries:
+  - `stats.mine()`
+  - `stats.leaderboard({ board, window: "week"|"all", limit? })`
+  - `stats.forGame({ gameId })`
+  - `stats.recentResults({ limit? })`
+- Mutation: `stats.setListed({ listed })`.
+- Internal: `stats.computeDistance`, `stats.backfill`.
+- Tour flag: `useTourSeen()` / `markTourSeen()` / `resetTour()` in `src/lib/tour.ts`.
+- Characters: `Hunter`, `Runner`, `Referee`, `Avatar` from `src/components/characters`.

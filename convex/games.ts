@@ -21,6 +21,7 @@ import {
   requirePlayer,
   requireUser,
 } from "./lib";
+import { recordGameResults } from "./stats";
 import { gameSettingsV, rolePreferenceV, winnerV } from "./validators";
 
 const GAME_TTL_MS = 7 * 24 * 3_600_000;
@@ -57,6 +58,7 @@ async function finishGame(
 ) {
   if (game.status === "ended") return;
   await ctx.db.patch(game._id, { status: "ended", endedAt: now, winner });
+  await recordGameResults(ctx, { ...game, status: "ended", endedAt: now, winner }, winner, now);
   const players = (await gamePlayers(ctx, game._id)).filter((p) => p.status !== "left");
   await notify(
     ctx,
