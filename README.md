@@ -1,56 +1,52 @@
-# Welcome to your Expo app 👋
+# Saklambaç
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**Kardiyo odaklı, gerçek zamanlı saklambaç.** Mahalleyi oyun alanına çevir. Kaçaklar saklanır, avcılar koşarak kovalar, telefon da hakemlik yapar.
 
-## Get started
+Oyunu ekran başında değil, sokakta ve yürüyerek oynarsın. Avcılar kaçakları haritada canlı göremez. Birkaç dakikada bir gelen **ping**, kaçakların o anki yerini gösterir; gerisi tahmin, taktik ve kondisyon işi.
 
-1. Install dependencies
+## Nasıl oynanır
 
-   ```bash
-   npm install
-   ```
+1. **Kur:** Bir kişi haritada oyun alanını (400 m – 3 km) seçer. Süreyi, ping aralığını ve avansı ayarlar, 6 haneli kodu paylaşır.
+2. **Katıl:** Arkadaşların kodla katılır ve Avcı, Kaçak ya da Rastgele seçer. Takımlar dengesizse oyun başlamaz. En az 3 oyuncu gerekir.
+3. **Kaç:** Kaçaklar avans süresinde dağılıp alan içinde saklanır. Avcılar bekler.
+4. **Avla:** Her pingte avcılar kaçakların konumunu görür. Kaçaklar yüz yüze yakalanır, yakalanan kaçak uygulamadan onaylar.
+5. **Kazan:** Bütün kaçaklar yakalanırsa avcılar kazanır. Süre biterken serbest kalan varsa kaçaklar kazanır.
 
-2. Start the app
+## Özellikler
 
-   ```bash
-   npx expo start
-   ```
+- **Görünürlük kuralları:**
+  - Takım arkadaşlarını canlı görürsün.
+  - Avcılar kaçakları sadece pinglerde görür.
+  - Kaçaklar avcıları hiç görmez.
+  - Alanın dışında 30 saniyeden fazla kalan kaçak, avcılara canlı görünür.
+- **Telsiz:** Takım içi sohbet, küfür filtresiyle.
+- **Bildirimler:** Ping, yakalanma ve tur sonu bildirimleri. Sessiz ve sadece titreşimli, saklandığın yer ele verilmesin diye.
+- **Arka planda konum:** Telefon cepteyken ve kilitliyken de konum gönderilir.
+- **Karakterli tanıtım:** Doğan (avcı), Çevik (kaçak) ve Düdük (hakem).
+- **Puan ve sıralama:** Haftalık ve tüm zamanlar; en iyi avcılar, en iyi kaçaklar, en çok oynayanlar.
+- **Profil:** Fotoğraf, istatistikler ve son oyunlar.
 
-In the output, you'll find options to open the app in a
+## Teknoloji
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+| Katman | Kullanılan |
+|---|---|
+| Mobil | Expo SDK 58, React Native, Expo Router, react-native-maps, react-native-svg |
+| Backend | Convex (gerçek zamanlı veritabanı, zamanlanmış işler, dosya depolama) |
+| Giriş | @convex-dev/auth, e-posta ile tek kullanımlık kod (Resend) |
+| Konum ve bildirim | expo-location + expo-task-manager, expo-notifications (Expo Push) |
+| Oyun kuralları | `src/engine`: saf TypeScript, Vitest testleri |
 
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Geliştirme
 
 ```bash
-npm run reset-project
+npm install
+CONVEX_AGENT_MODE=anonymous npx convex dev   # yerel backend (http://127.0.0.1:3211)
+npx expo start                               # Expo geliştirme sunucusu
+npm test                                     # oyun motoru testleri
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+- **Telefonda denemek:** `.env.development.local` dosyasına `EXPO_PUBLIC_CONVEX_URL=http://<Mac'in LAN IP'si>:3211` yaz.
+- **Giriş kodları:** `AUTH_RESEND_KEY` tanımlı değilse kodlar e-postayla gitmez, Convex loguna yazılır.
+- **Expo Go'nun sınırları:** Arka planda konum ve uzaktan push Expo Go'da çalışmaz. Bunlar için bir development build gerekir (`npx expo run:ios` / `run:android` ya da EAS).
 
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Mimari ve API sözleşmesi: [CONTRACT.md](CONTRACT.md). v2 tasarımı ve benchmark: [docs/DESIGN-v2.md](docs/DESIGN-v2.md).
